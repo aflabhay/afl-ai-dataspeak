@@ -1,6 +1,7 @@
 variable "project_id" {
   description = "GCP project ID"
   type        = string
+  default     = "arvind-brands-poc"
 }
 
 variable "region" {

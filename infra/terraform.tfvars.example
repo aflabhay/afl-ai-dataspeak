@@ -9,7 +9,7 @@
 #   terraform plan
 #   terraform apply
 
-project_id = "your-gcp-project-id"
+project_id = "arvind-brands-poc"
 region     = "asia-south1"
 app_name   = "aida"
 
