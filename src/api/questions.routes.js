@@ -65,15 +65,11 @@ router.get('/', async (req, res, next) => {
       return res.json({ categories: bqStored });
     }
 
-    // ── Fetch column metadata (proactively creates metadata if missing) ───────
-    // Always call fetchSchema() first — this triggers source sampling and
-    // populates t_aida_table_column_metadata if the table has never been queried.
-    logger.info(`Fetching schema to proactively create metadata for ${tableName}`);
-    const schema = source === 'bigquery'
-      ? await bqSchemaFetcher.fetchSchema(dataset, [tableName])
-      : await fbSchemaFetcher.fetchSchema(dataset, [tableName]);
-
-    // Now try metadata table (should be populated by fetchSchema above)
+    // ── Fetch column metadata ─────────────────────────────────────────────────
+    // Metadata is already warmed by SourceSelector's background call to
+    // /api/schema/metadata whenever the user focuses a table.
+    // Try the metadata table first (has descriptions + samples); fall back
+    // to a live schema fetch if metadata isn't populated yet.
     let columns = [];
     const metaMap = await columnMetadata.getSamples(dataset, tableName);
 
@@ -85,7 +81,11 @@ router.get('/', async (req, res, next) => {
         samples:     meta.samples || [],
       }));
     } else {
-      // Use schema columns (no samples yet — metadata creation may be in-flight)
+      // Metadata not yet available — fetch schema live as fallback
+      logger.info(`Metadata not ready for ${tableName} — falling back to live schema fetch`);
+      const schema = source === 'bigquery'
+        ? await bqSchemaFetcher.fetchSchema(dataset, [tableName])
+        : await fbSchemaFetcher.fetchSchema(dataset, [tableName]);
       const tableSchema = schema?.[0];
       if (tableSchema) {
         columns = tableSchema.columns.map(c => ({

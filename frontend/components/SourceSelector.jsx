@@ -3,7 +3,7 @@
  * Sidebar panel for data source, dataset, and table configuration.
  * Includes a "View Columns" button that shows column metadata in a modal.
  */
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useUser } from '../lib/UserContext';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -17,6 +17,27 @@ export default function SourceSelector({
   const [metaLoading, setMetaLoading] = useState(false);
   const [metaData,    setMetaData]    = useState(null);
   const [metaError,   setMetaError]   = useState(null);
+  const warmDebounce = useRef(null);
+
+  // ── Silently warm metadata whenever table + dataset are both set ────────────
+  // Calls /api/schema/metadata in the background (no loading state shown).
+  // This triggers a one-time source table scan that populates
+  // t_aida_table_column_metadata so it's ready before the user asks anything.
+  useEffect(() => {
+    if (!table || !dataset) return;
+    clearTimeout(warmDebounce.current);
+    warmDebounce.current = setTimeout(async () => {
+      try {
+        const authHeaders = await getAuthHeaders();
+        await fetch(
+          `${API_URL}/api/schema/metadata?dataset=${encodeURIComponent(dataset)}&table=${encodeURIComponent(table)}&source=${encodeURIComponent(source)}`,
+          { headers: { 'Content-Type': 'application/json', ...authHeaders } }
+        );
+        // Fire-and-forget — result is not needed here; metadata is now cached in BQ
+      } catch { /* non-critical */ }
+    }, 800);
+    return () => clearTimeout(warmDebounce.current);
+  }, [table, dataset, source]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function openMetadata() {
     if (!dataset || !table) return;

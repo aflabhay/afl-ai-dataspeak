@@ -1179,6 +1179,34 @@ tbody td:first-child { font-weight: 500; }
   opacity: .5;
 }
 
+/* ── Generate Sample Questions button ────────────────────────────────────── */
+.qmenu-generate-wrap {
+  padding: 10px 16px 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.qmenu-generate-btn {
+  width: 100%;
+  padding: 8px 14px;
+  background: rgba(37,99,235,.15);
+  border: 1px dashed rgba(37,99,235,.4);
+  border-radius: 8px;
+  color: rgba(255,255,255,.7);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: center;
+  transition: background .15s, color .15s, border-color .15s;
+  letter-spacing: .01em;
+}
+
+.qmenu-generate-btn:hover {
+  background: rgba(37,99,235,.28);
+  color: #fff;
+  border-color: rgba(37,99,235,.7);
+}
+
 /* ── View Columns / Metadata Button ──────────────────────────────────────── */
 .meta-view-btn {
   width: 100%;
