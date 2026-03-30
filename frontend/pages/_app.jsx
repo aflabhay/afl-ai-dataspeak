@@ -17,6 +17,10 @@ export default function App({ Component, pageProps }) {
 
     const instance = new PublicClientApplication(msalConfig);
     instance.initialize()
+      .then(() => {
+        // Handle the redirect response when returning from Microsoft login page
+        return instance.handleRedirectPromise();
+      })
       .then(() => setMsalInstance(instance))
       .catch(err => console.error('MSAL initialization failed:', err));
   }, []);

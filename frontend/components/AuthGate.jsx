@@ -63,13 +63,13 @@ export default function AuthGate({ children }) {
     setLoginError(null);
     setLoginLoading(true);
     try {
-      await instance.loginPopup(loginRequest);
+      // Use redirect (not popup) — avoids browser popup blocking entirely
+      await instance.loginRedirect(loginRequest);
     } catch (err) {
+      setLoginLoading(false);
       if (err.errorCode !== 'user_cancelled') {
         setLoginError(`Sign-in failed: ${err.errorMessage || err.message || err.errorCode}`);
       }
-    } finally {
-      setLoginLoading(false);
     }
   }
 
@@ -78,17 +78,14 @@ export default function AuthGate({ children }) {
       const result = await instance.acquireTokenSilent({ ...loginRequest, account });
       return { Authorization: `Bearer ${result.idToken}` };
     } catch {
-      try {
-        const result = await instance.acquireTokenPopup({ ...loginRequest, account });
-        return { Authorization: `Bearer ${result.idToken}` };
-      } catch {
-        return {};
-      }
+      // Silent failed — trigger redirect to re-authenticate
+      await instance.acquireTokenRedirect({ ...loginRequest, account });
+      return {};
     }
   }
 
   function handleLogout() {
-    instance.logoutPopup({ account });
+    instance.logoutRedirect({ account });
   }
 
   if (!isAuthenticated) {
