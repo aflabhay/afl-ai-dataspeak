@@ -13,11 +13,15 @@ const helmet  = require('helmet');
 const compression = require('compression');
 const rateLimit   = require('express-rate-limit');
 
-const chatRoutes   = require('./src/api/chat.routes');
-const schemaRoutes = require('./src/api/schema.routes');
-const healthRoutes = require('./src/api/health.routes');
-const errorHandler = require('./src/utils/error.handler');
-const logger       = require('./src/utils/logger');
+const chatRoutes      = require('./src/api/chat.routes');
+const schemaRoutes    = require('./src/api/schema.routes');
+const healthRoutes    = require('./src/api/health.routes');
+const feedbackRoutes  = require('./src/api/feedback.routes');
+const historyRoutes   = require('./src/api/history.routes');
+const questionsRoutes = require('./src/api/questions.routes');
+const { requireAuth } = require('./src/middleware/auth.middleware');
+const errorHandler    = require('./src/utils/error.handler');
+const logger          = require('./src/utils/logger');
 
 const app  = express();
 const PORT = process.env.PORT || 4000;
@@ -28,7 +32,7 @@ app.use(compression());
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Guest-Id', 'X-Guest-Name', 'X-Guest-Email'],
 }));
 app.use(express.json({ limit: '1mb' }));
 
@@ -49,18 +53,23 @@ app.use((req, _res, next) => {
 });
 
 // ── Routes ───────────────────────────────────────────────────────────────────
-app.use('/api/chat',   chatRoutes);
-app.use('/api/schema', schemaRoutes);
-app.use('/api/health', healthRoutes);
+app.use('/api/health',    healthRoutes);           // health check — no auth needed
+app.use('/api/questions', questionsRoutes);         // question menu — no auth needed
+app.use('/api/chat',      requireAuth, chatRoutes);
+app.use('/api/schema',    requireAuth, schemaRoutes);
+app.use('/api/feedback',  requireAuth, feedbackRoutes);
+app.use('/api/history',   requireAuth, historyRoutes);
 
 // ── Global Error Handler ─────────────────────────────────────────────────────
 app.use(errorHandler);
 
 // ── Start Server ─────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  logger.info(`🚀 Server running on http://localhost:${PORT}`);
+  logger.info(`🚀 AIDA server running on http://localhost:${PORT}`);
   logger.info(`📊 BigQuery project: ${process.env.GCP_PROJECT_ID}`);
-  logger.info(`🤖 Claude model: claude-sonnet-4-20250514`);
+  logger.info(`🗄  AIDA dataset: ${process.env.GCP_FEEDBACK_DATASET || 'AIDA'}`);
+
+  // Questions are now dynamically generated per-table from column metadata — no seeding needed
 });
 
 module.exports = app; // exported for testing

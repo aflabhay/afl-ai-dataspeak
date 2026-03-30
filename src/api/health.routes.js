@@ -7,8 +7,10 @@
  * and uptime monitors to verify the service is running.
  */
 
-const express = require('express');
-const router  = express.Router();
+const express       = require('express');
+const router        = express.Router();
+const resultCache   = require('../utils/result.cache');
+const semanticCache = require('../utils/semantic.cache');
 
 router.get('/', (_req, res) => {
   res.json({
@@ -17,6 +19,10 @@ router.get('/', (_req, res) => {
     uptime:    process.uptime(),
     version:   process.env.npm_package_version || '1.0.0',
     env:       process.env.NODE_ENV || 'development',
+    cache: {
+      result:   resultCache.stats(),
+      semantic: semanticCache.stats(),
+    },
   });
 });
 

@@ -33,9 +33,16 @@ async function fetchSchema(schemaName, tables = []) {
 
   const pool = await getPool();
 
-  const tableFilter = tables.length > 0
-    ? `AND c.TABLE_NAME IN (${tables.map(t => `'${t}'`).join(',')})`
-    : '';
+  const request = pool.request().input('schema', schemaName);
+
+  let tableFilter = '';
+  if (tables.length > 0) {
+    const params = tables.map((t, i) => {
+      request.input(`t${i}`, t);
+      return `@t${i}`;
+    });
+    tableFilter = `AND c.TABLE_NAME IN (${params.join(',')})`;
+  }
 
   const query = `
     SELECT
@@ -54,9 +61,7 @@ async function fetchSchema(schemaName, tables = []) {
     ORDER BY c.TABLE_NAME, c.ORDINAL_POSITION
   `;
 
-  const result = await pool.request()
-    .input('schema', schemaName)
-    .query(query);
+  const result = await request.query(query);
 
   // Group columns by table
   const tableMap = new Map();
@@ -84,6 +89,31 @@ async function fetchSchema(schemaName, tables = []) {
 }
 
 /**
+ * List all table names in a schema (no column metadata — very cheap call).
+ *
+ * @param {string} schemaName
+ * @returns {Promise<string[]>}
+ */
+async function listTables(schemaName) {
+  const cacheKey = `fabric.${schemaName}.__tableNames`;
+
+  if (schemaCache.has(cacheKey)) {
+    const { names, fetchedAt } = schemaCache.get(cacheKey);
+    if (Date.now() - fetchedAt < CACHE_TTL_MS) return names;
+  }
+
+  const pool   = await getPool();
+  const result = await pool.request()
+    .input('schema', schemaName)
+    .query(`SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = @schema ORDER BY TABLE_NAME`);
+
+  const names = result.recordset.map(r => r.TABLE_NAME);
+  schemaCache.set(cacheKey, { names, fetchedAt: Date.now() });
+  logger.info(`Listed ${names.length} tables in Fabric schema ${schemaName}`);
+  return names;
+}
+
+/**
  * List available schemas in the Fabric warehouse.
  * @returns {Promise<string[]>}
  */
@@ -102,4 +132,4 @@ function filterByTables(schema, tables) {
   return schema.filter(s => tables.includes(s.tableName));
 }
 
-module.exports = { fetchSchema, listSchemas };
+module.exports = { fetchSchema, listTables, listSchemas };

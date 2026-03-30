@@ -9,7 +9,8 @@ const { getPool }      = require('./fabric.client');
 const { validateReadOnly } = require('../claude/sql.extractor');
 const logger = require('../utils/logger');
 
-const MAX_ROWS = 10_000;
+const MAX_ROWS       = 100;
+const QUERY_TIMEOUT  = 60_000;
 
 /**
  * Run a T-SQL query and return rows as plain objects.
@@ -25,7 +26,12 @@ async function run(sql) {
 
   logger.info('Running Fabric query...');
   const pool   = await getPool();
-  const result = await pool.request().query(sql);
+  const result = await Promise.race([
+    pool.request().query(sql),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`Fabric query timed out after ${QUERY_TIMEOUT / 1000}s`)), QUERY_TIMEOUT)
+    ),
+  ]);
 
   const rows = result.recordset || [];
 

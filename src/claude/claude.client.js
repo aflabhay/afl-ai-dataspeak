@@ -23,14 +23,33 @@ const MAX_TOKENS     = 2048;
 const MAX_RETRIES    = 3;
 const RETRY_DELAY_MS = 1000;
 
+// Pricing per 1M tokens (USD)
+const PRICING = { input: 3.00, output: 15.00 };
+
+function calcCost(usage) {
+  const inputCost  = (usage.input_tokens  / 1_000_000) * PRICING.input;
+  const outputCost = (usage.output_tokens / 1_000_000) * PRICING.output;
+  return {
+    model:            MODEL,
+    promptTokens:     usage.input_tokens,
+    completionTokens: usage.output_tokens,
+    totalTokens:      usage.input_tokens + usage.output_tokens,
+    estimatedCost:    `$${(inputCost + outputCost).toFixed(6)}`,
+  };
+}
+
 /**
- * Send a question to Claude with a system prompt and return the text reply.
+ * Send a conversation to Claude and return the text reply.
  *
- * @param {string} systemPrompt — context about the data source and schema
- * @param {string} userQuestion — the natural language question
- * @returns {Promise<string>}   — Claude's full text response
+ * @param {string}   systemPrompt — context about the data source and schema
+ * @param {string|Array} messages — single question string OR [{role,content}] history array
+ * @returns {Promise<string>}
  */
-async function ask(systemPrompt, userQuestion) {
+async function ask(systemPrompt, messages) {
+  const history = Array.isArray(messages)
+    ? messages
+    : [{ role: 'user', content: messages }];
+
   let attempt = 0;
 
   while (attempt < MAX_RETRIES) {
@@ -39,20 +58,14 @@ async function ask(systemPrompt, userQuestion) {
         model:      MODEL,
         max_tokens: MAX_TOKENS,
         system:     systemPrompt,
-        messages: [
-          { role: 'user', content: userQuestion },
-        ],
+        messages:   history,
       });
 
-      // Log token usage for monitoring
-      const usage = response.usage;
-      logger.info('Claude token usage', {
-        input_tokens:  usage.input_tokens,
-        output_tokens: usage.output_tokens,
-        total:         usage.input_tokens + usage.output_tokens,
-      });
+      const usage  = response.usage;
+      const aiCost = calcCost(usage);
+      logger.info('Claude token usage', aiCost);
 
-      return response.content[0].text;
+      return { text: response.content[0].text, aiCost };
 
     } catch (err) {
       attempt++;
