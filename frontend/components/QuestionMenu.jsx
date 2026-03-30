@@ -1,50 +1,82 @@
 /**
  * frontend/components/QuestionMenu.jsx
- * Shows AI-generated suggested questions for the focused table.
- * Questions are NOT auto-generated — user clicks "Generate Sample Questions"
- * to trigger generation. Schema metadata is already warmed by SourceSelector.
+ * - On mount / table change: silently checks BQ for stored questions (checkOnly).
+ *   If found → displays them immediately, no button needed.
+ *   If not found → shows "Generate Sample Questions" button for manual trigger.
  */
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 const DEFAULT_ICONS = ['✦', '📊', '👥', '📈', '🗺', '💎', '🎯', '🏷', '🔗', '🩺'];
 
 export default function QuestionMenu({ table, dataset, source, onSelect }) {
-  const [categories, setCategories] = useState([]);
-  const [loading,    setLoading]    = useState(false);
-  const [triggered,  setTriggered]  = useState(false);
-  const [openCats,   setOpenCats]   = useState(new Set());
-  const lastKeyRef                  = useRef('');
+  const [categories,  setCategories]  = useState([]);
+  const [checking,    setChecking]    = useState(false); // silent BQ check
+  const [generating,  setGenerating]  = useState(false); // manual AI generation
+  const [showButton,  setShowButton]  = useState(false); // no stored questions found
+  const [openCats,    setOpenCats]    = useState(new Set());
+  const debounceRef                   = useRef(null);
+  const lastKeyRef                    = useRef('');
 
-  // Reset when table/dataset changes so the button reappears for new table
-  const currentKey = `${source || 'bigquery'}.${dataset}.${table}`;
-  if (lastKeyRef.current && lastKeyRef.current !== currentKey && triggered) {
+  useEffect(() => {
+    if (!table || !dataset) { setCategories([]); setShowButton(false); return; }
+
+    const key = `${source || 'bigquery'}.${dataset}.${table}`;
+    if (key === lastKeyRef.current) return; // same table — no re-check needed
+
+    // Reset state for new table
     setCategories([]);
-    setTriggered(false);
-    setOpenCats(new Set());
-    lastKeyRef.current = '';
+    setShowButton(false);
+
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => checkStored(table, dataset, source || 'bigquery', key), 600);
+    return () => clearTimeout(debounceRef.current);
+  }, [table, dataset, source]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Silent BQ check — returns stored questions or shows the generate button ──
+  async function checkStored(tableName, ds, src, key) {
+    setChecking(true);
+    try {
+      const url = `${API_URL}/api/questions?table=${encodeURIComponent(tableName)}&dataset=${encodeURIComponent(ds)}&source=${encodeURIComponent(src)}&checkOnly=true`;
+      const res = await fetch(url);
+      if (!res.ok) { setShowButton(true); return; }
+      const { categories: cats } = await res.json();
+      if (cats && cats.length > 0) {
+        lastKeyRef.current = key;
+        setCategories(cats);
+        setOpenCats(new Set([cats[0].category]));
+        setShowButton(false);
+      } else {
+        setShowButton(true); // nothing stored → show generate button
+      }
+    } catch {
+      setShowButton(true);
+    } finally {
+      setChecking(false);
+    }
   }
 
+  // ── Manual generation — only called when user clicks the button ─────────────
   async function generateQuestions() {
-    if (!table || !dataset || loading) return;
-    setTriggered(true);
-    setLoading(true);
-    setCategories([]);
+    if (!table || !dataset || generating) return;
+    setGenerating(true);
+    setShowButton(false);
     try {
       const src = source || 'bigquery';
       const url = `${API_URL}/api/questions?table=${encodeURIComponent(table)}&dataset=${encodeURIComponent(dataset)}&source=${encodeURIComponent(src)}`;
       const res = await fetch(url);
-      if (!res.ok) return;
+      if (!res.ok) { setShowButton(true); return; }
       const { categories: cats } = await res.json();
-      lastKeyRef.current = currentKey;
+      const key = `${src}.${dataset}.${table}`;
+      lastKeyRef.current = key;
       setCategories(cats || []);
-      // Auto-open first category
       if (cats && cats.length > 0) setOpenCats(new Set([cats[0].category]));
+      else setShowButton(true);
     } catch {
-      // non-critical
+      setShowButton(true);
     } finally {
-      setLoading(false);
+      setGenerating(false);
     }
   }
 
@@ -58,8 +90,27 @@ export default function QuestionMenu({ table, dataset, source, onSelect }) {
 
   if (!table || !dataset) return null;
 
-  // ── Not yet triggered — show the generate button ──────────────────────────
-  if (!triggered) {
+  // Silent checking spinner (very brief)
+  if (checking) {
+    return (
+      <div className="qmenu-loading">
+        <span className="dot" /><span className="dot" /><span className="dot" />
+      </div>
+    );
+  }
+
+  // AI generation in progress
+  if (generating) {
+    return (
+      <div className="qmenu-loading">
+        <span className="dot" /><span className="dot" /><span className="dot" />
+        <span className="qmenu-loading-text">Generating questions…</span>
+      </div>
+    );
+  }
+
+  // No stored questions — show generate button
+  if (showButton) {
     return (
       <div className="qmenu-generate-wrap">
         <button className="qmenu-generate-btn" onClick={generateQuestions}>
@@ -69,29 +120,9 @@ export default function QuestionMenu({ table, dataset, source, onSelect }) {
     );
   }
 
-  // ── Loading ───────────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className="qmenu-loading">
-        <span className="dot" /><span className="dot" /><span className="dot" />
-        <span className="qmenu-loading-text">Generating questions…</span>
-      </div>
-    );
-  }
+  // Questions loaded — display them
+  if (categories.length === 0) return null;
 
-  // ── No questions returned ─────────────────────────────────────────────────
-  if (categories.length === 0) {
-    return (
-      <div className="qmenu-generate-wrap">
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>No questions generated.</span>
-        <button className="qmenu-generate-btn" style={{ marginTop: 6 }} onClick={() => { setTriggered(false); }}>
-          ↻ Retry
-        </button>
-      </div>
-    );
-  }
-
-  // ── Questions loaded ──────────────────────────────────────────────────────
   return (
     <div className="qmenu">
       <div className="sidebar-section-title qmenu-header">Sample Questions</div>

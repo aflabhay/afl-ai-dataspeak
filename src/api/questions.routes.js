@@ -39,9 +39,10 @@ function getAIClient() {
 }
 
 router.get('/', async (req, res, next) => {
-  const tableName = (req.query.table   || '').trim();
-  const dataset   = (req.query.dataset || '').trim();
-  const source    = (req.query.source  || 'bigquery').trim();
+  const tableName = (req.query.table     || '').trim();
+  const dataset   = (req.query.dataset   || '').trim();
+  const source    = (req.query.source    || 'bigquery').trim();
+  const checkOnly = req.query.checkOnly  === 'true'; // if true: return stored only, never generate
 
   if (!tableName || !dataset) {
     return res.json({ categories: [] });
@@ -63,6 +64,11 @@ router.get('/', async (req, res, next) => {
       logger.info(`Question cache hit (BigQuery) for ${tableName} (${bqStored.length} categories)`);
       cache.set(cacheKey, { categories: bqStored, generatedAt: Date.now() });
       return res.json({ categories: bqStored });
+    }
+
+    // ── checkOnly: return empty — don't generate ──────────────────────────────
+    if (checkOnly) {
+      return res.json({ categories: [] });
     }
 
     // ── Fetch column metadata ─────────────────────────────────────────────────
