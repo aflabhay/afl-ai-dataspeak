@@ -24,8 +24,8 @@ Classify the user's question into exactly one of:
 
 QUERY     - needs data retrieved from a database (counts, aggregations, lists, trends, comparisons, insights)
 SCHEMA    - asking about table/column structure, field names, data types, what columns exist, what a field means
-CHAT      - conversational question about AFL business data: SQL advice, RFM concepts, clarifications about previous results, data/analytics questions
-OFF_TOPIC - anything unrelated to AFL business data, analytics, or SQL — personal questions, fitness, finance, general knowledge, coding help, creative writing, or any non-AFL topic
+CHAT      - conversational question about AFL business data, SQL advice, RFM concepts, clarifications about previous results, data/analytics questions — AND identity/introductory questions about AIDA itself (who are you, what can you do, how are you built, etc.)
+OFF_TOPIC - anything unrelated to AFL business data, analytics, SQL, or AIDA itself — personal questions, fitness, finance, general knowledge, coding help, creative writing, or any non-AFL topic
 
 Reply with ONLY the single word: QUERY, SCHEMA, CHAT, or OFF_TOPIC. No explanation.
 
@@ -41,7 +41,12 @@ Examples:
 "what is the capital of France?" → OFF_TOPIC
 "help me invest in stocks" → OFF_TOPIC
 "write me a poem" → OFF_TOPIC
-"what's the weather today?" → OFF_TOPIC`;
+"what's the weather today?" → OFF_TOPIC
+"who are you?" → CHAT
+"what can you do?" → CHAT
+"how are you built?" → CHAT
+"what is AIDA?" → CHAT
+"tell me about yourself" → CHAT`;
 
 /**
  * Classify the intent of a user question.

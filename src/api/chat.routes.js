@@ -165,6 +165,30 @@ ${schemaContext}`;
     if (intent === 'CHAT') {
       logger.info(`CHAT intent — answering conversationally: "${question}"`);
 
+      // ── Identity / introductory questions — answer directly ───────────────
+      const identityPatterns = /\b(who are you|what are you|tell me about yourself|what can you do|what is aida|how are you built|who made you|what('s| is) your (name|purpose|role)|introduce yourself)\b/i;
+      if (identityPatterns.test(question)) {
+        const identity = `I'm **AIDA** — Arvind Intelligent Data Assistant, built for Arvind Fashions Limited.
+
+**What I do:**
+- Translate your plain-English questions into SQL and run them against AFL's BigQuery and Microsoft Fabric data warehouses
+- Answer questions about sales, customers, brands, RFM analysis, cohorts, and all AFL business analytics
+- Explain query results, describe table structures, and help you explore your data
+
+**How I'm built:**
+- Natural language → SQL engine powered by Claude (Anthropic) / GPT-4o (OpenAI)
+- Connected to Google BigQuery and Microsoft Fabric via secure service accounts
+- Authenticated via your AFL Microsoft account (Azure AD)
+- Intent classifier routes each question to the right handler — SQL query, schema lookup, or conversational answer
+- Semantic cache remembers previous questions so repeat queries are instant
+
+Just ask me a question about AFL data and I'll get you the answer.`;
+
+        const identityMs = Date.now() - startTime;
+        saveTurn({ id: turnId, sessionId, question, explanation: identity, aiProvider: 'None', source, dataset, intent: 'CHAT', executionMs: identityMs, userId: user.id, userName: user.name, userEmail: user.email }).catch(() => {});
+        return res.json({ turnId, explanation: identity, sql: null, results: null, rowCount: 0, executionMs: identityMs, sessionId, aiProvider: 'None', intent: 'CHAT' });
+      }
+
       // Fetch schema for context so AI can give accurate SQL advice
       const targetTables = tables.length > 0 ? tables : [];
       let schemaContext  = '';
