@@ -172,7 +172,7 @@ ${schemaContext}`;
 
 **What I do:**
 - Translate your plain-English questions into SQL and run them against AFL's BigQuery and Microsoft Fabric data warehouses
-- Answer questions about sales, customers, brands, RFM analysis, cohorts, and all AFL business analytics
+- Answer questions about sales, customers, brands, and all AFL business analytics across any dataset or table
 - Explain query results, describe table structures, and help you explore your data
 
 **How I'm built:**
