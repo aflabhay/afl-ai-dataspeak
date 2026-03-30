@@ -1,17 +1,31 @@
 import '../styles/globals.css';
+import { useState, useEffect } from 'react';
+import { MsalProvider }            from '@azure/msal-react';
+import { PublicClientApplication } from '@azure/msal-browser';
 import { isMsalConfigured, msalConfig } from '../lib/msalConfig';
 
-// Static imports — packages must be installed
-import { MsalProvider }             from '@azure/msal-react';
-import { PublicClientApplication }  from '@azure/msal-browser';
-
-// Create the MSAL instance once at module level (client-side only)
-// MsalProvider automatically calls initialize() internally in msal-react v2+
-const msalInstance = isMsalConfigured && typeof window !== 'undefined'
-  ? new PublicClientApplication(msalConfig)
-  : null;
-
+/**
+ * MSAL v3+ requires explicit async initialize() before first use.
+ * Creating and initializing inside useEffect ensures it runs client-side only —
+ * avoids the "stubbed_public_client_application_called" SSR error in Next.js.
+ */
 export default function App({ Component, pageProps }) {
+  const [msalInstance, setMsalInstance] = useState(null);
+
+  useEffect(() => {
+    if (!isMsalConfigured) return;
+
+    const instance = new PublicClientApplication(msalConfig);
+    instance.initialize()
+      .then(() => setMsalInstance(instance))
+      .catch(err => console.error('MSAL initialization failed:', err));
+  }, []);
+
+  // MSAL configured but not yet initialized — hold rendering until ready
+  if (isMsalConfigured && !msalInstance) {
+    return null;
+  }
+
   if (isMsalConfigured && msalInstance) {
     return (
       <MsalProvider instance={msalInstance}>
@@ -19,5 +33,6 @@ export default function App({ Component, pageProps }) {
       </MsalProvider>
     );
   }
+
   return <Component {...pageProps} />;
 }
