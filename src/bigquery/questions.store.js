@@ -305,16 +305,8 @@ async function saveGeneratedQuestions(tableName, dataset, source, categories) {
     const bq  = getClient();
     const now = new Date().toISOString();
 
-    // Delete existing rows for this table
-    await bq.query({
-      query: `
-        DELETE FROM \`${DATASET}.${DYNAMIC_TABLE}\`
-        WHERE table_name = @tableName AND dataset_name = @dataset AND source = @source
-      `,
-      params: { tableName, dataset, source },
-    });
-
-    // Insert new rows via DML
+    // Insert new rows via DML (no DELETE — questions are permanent;
+    // delete manually from GCP console if regeneration is needed)
     for (const cat of categories) {
       await bq.query({
         query: `
