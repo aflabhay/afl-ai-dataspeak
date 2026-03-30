@@ -189,6 +189,22 @@ Just ask me a question about AFL data and I'll get you the answer.`;
         return res.json({ turnId, explanation: identity, sql: null, results: null, rowCount: 0, executionMs: identityMs, sessionId, aiProvider: 'None', intent: 'CHAT' });
       }
 
+      // ── Compliments / gratitude — respond warmly ──────────────────────────
+      const complimentPatterns = /\b(thank(s| you)|love you|you('re| are) (awesome|amazing|great|fantastic|brilliant|the best|helpful)|great (job|work|answer)|well done|nicely done|appreciate|you rock|good (job|work)|cheers)\b/i;
+      if (complimentPatterns.test(question)) {
+        const replies = [
+          "Thank you, that means a lot! 😊 Happy to help whenever you need data insights.",
+          "Glad I could help! Feel free to ask me anything about AFL's data anytime.",
+          "That's very kind — thank you! I'm here whenever you have a data question.",
+          "Happy to be useful! Just ask whenever you need something from the data.",
+          "Thank you! It's a pleasure helping the AFL team with data. What would you like to explore next?",
+        ];
+        const warmReply = replies[Math.floor(Math.random() * replies.length)];
+        const complimentMs = Date.now() - startTime;
+        saveTurn({ id: turnId, sessionId, question, explanation: warmReply, aiProvider: 'None', source, dataset, intent: 'CHAT', executionMs: complimentMs, userId: user.id, userName: user.name, userEmail: user.email }).catch(() => {});
+        return res.json({ turnId, explanation: warmReply, sql: null, results: null, rowCount: 0, executionMs: complimentMs, sessionId, aiProvider: 'None', intent: 'CHAT' });
+      }
+
       // Fetch schema for context so AI can give accurate SQL advice
       const targetTables = tables.length > 0 ? tables : [];
       let schemaContext  = '';
