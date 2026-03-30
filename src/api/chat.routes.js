@@ -384,7 +384,9 @@ ${schemaContext ? `\nRelevant schema context:\n${schemaContext}` : ''}`;
 
     // Save turn to chat history async — don't block the response
     // Store up to 200 chart rows so we can re-render the chart on history load.
-    const chartWithData = validatedChart ? { ...validatedChart, data: results.slice(0, 200) } : null;
+    // Cap embedded chart data at 50 rows — BigQuery streaming inserts have a ~1MB per-row limit.
+    // 200 rows of wide result sets can silently fail the insert, leaving chart_config NULL in history.
+    const chartWithData = validatedChart ? { ...validatedChart, data: results.slice(0, 50) } : null;
     saveTurn({
       id:               turnId,
       sessionId,

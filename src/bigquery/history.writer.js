@@ -125,7 +125,43 @@ async function saveTurn(turn) {
     confidence_reason:  turn.confidenceReason  || null,
   };
 
-  await bq.dataset(HISTORY_DATASET).table(HISTORY_TABLE).insert([row]);
+  // Use DML INSERT (not streaming insert) — no per-row size limit, immediately queryable
+  const escape = v => v === null || v === undefined
+    ? 'NULL'
+    : `'${String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+
+  await bq.query({
+    query: `
+      INSERT INTO \`${HISTORY_DATASET}.${HISTORY_TABLE}\`
+        (id, session_id, timestamp, user_id, user_name, user_email,
+         question, sql, explanation, ai_provider, tables_used, source,
+         dataset_name, row_count, execution_ms, intent, chart_config,
+         cost_info, ai_cost, confidence_score, confidence_reason)
+      VALUES (
+        ${escape(row.id)},
+        ${escape(row.session_id)},
+        TIMESTAMP(${escape(row.timestamp)}),
+        ${escape(row.user_id)},
+        ${escape(row.user_name)},
+        ${escape(row.user_email)},
+        ${escape(row.question)},
+        ${escape(row.sql)},
+        ${escape(row.explanation)},
+        ${escape(row.ai_provider)},
+        ${escape(row.tables_used)},
+        ${escape(row.source)},
+        ${escape(row.dataset_name)},
+        ${row.row_count ?? 'NULL'},
+        ${row.execution_ms ?? 'NULL'},
+        ${escape(row.intent)},
+        ${escape(row.chart_config)},
+        ${escape(row.cost_info)},
+        ${escape(row.ai_cost)},
+        ${row.confidence_score ?? 'NULL'},
+        ${escape(row.confidence_reason)}
+      )
+    `,
+  });
   logger.info(`Chat turn saved: ${id} for session: ${turn.sessionId}`);
   return id;
 }

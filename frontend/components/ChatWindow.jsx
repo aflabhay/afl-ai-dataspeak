@@ -63,11 +63,16 @@ export default function ChatWindow() {
             content:   turn.question,
             timestamp: turn.timestamp,
           });
+          let chartConfig = null;
+          if (turn.chart_config) {
+            try { chartConfig = JSON.parse(turn.chart_config); } catch { chartConfig = null; }
+          }
+
           restored.push({
             role:        'assistant',
             content:     turn.explanation || '',
             sql:         turn.sql         || null,
-            chart:       turn.chart_config ? JSON.parse(turn.chart_config) : null,
+            chart:       chartConfig,
             turnId:      turn.id,
             question:    turn.question,
             aiProvider:  turn.ai_provider || null,
@@ -296,7 +301,7 @@ export default function ChatWindow() {
               {msg.isHistorical && msg.intent === 'QUERY' && !msg.results && (
                 <div className="rerun-row">
                   <button className="rerun-btn" onClick={() => rerunQuestion(msg.question)} disabled={loading}>
-                    ↻ Re-run query to see latest results
+                    ↻ Re-run query to see latest results{msg.chart && (!msg.chart.data || msg.chart.data.length === 0) ? ' & chart' : ''}
                   </button>
                 </div>
               )}
