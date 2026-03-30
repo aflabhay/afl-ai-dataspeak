@@ -78,8 +78,10 @@ export default function AuthGate({ children }) {
       const result = await instance.acquireTokenSilent({ ...loginRequest, account });
       return { Authorization: `Bearer ${result.idToken}` };
     } catch {
-      // Silent failed — trigger redirect to re-authenticate
-      await instance.acquireTokenRedirect({ ...loginRequest, account });
+      // Silent refresh failed — return empty headers.
+      // Do NOT call acquireTokenRedirect here: it causes a full page redirect
+      // on every API call that fails silently, creating an infinite redirect loop.
+      // MSAL will handle re-auth naturally when isAuthenticated becomes false.
       return {};
     }
   }

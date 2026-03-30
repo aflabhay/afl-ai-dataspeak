@@ -1,36 +1,60 @@
 import '../styles/globals.css';
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { MsalProvider }            from '@azure/msal-react';
 import { PublicClientApplication } from '@azure/msal-browser';
 import { isMsalConfigured, msalConfig } from '../lib/msalConfig';
 
 /**
- * MSAL v3+ requires explicit async initialize() before first use.
- * Creating and initializing inside useEffect ensures it runs client-side only —
- * avoids the "stubbed_public_client_application_called" SSR error in Next.js.
+ * Module-level singletons — survive React Strict Mode's double-invoke of
+ * useEffect in dev. initialize() and handleRedirectPromise() must each run
+ * exactly once; a second call clears the processed auth state and logs the
+ * user out immediately after sign-in.
  */
+let _msalInstance  = null;
+let _initPromise   = null;
+
+function getMsalInstance() {
+  if (!isMsalConfigured || typeof window === 'undefined') return null;
+  if (!_msalInstance) _msalInstance = new PublicClientApplication(msalConfig);
+  return _msalInstance;
+}
+
+function initMsal() {
+  if (_initPromise) return _initPromise;           // already running / done
+  const instance = getMsalInstance();
+  if (!instance) return (_initPromise = Promise.resolve(null));
+
+  _initPromise = instance
+    .initialize()
+    .then(() => instance.handleRedirectPromise())  // process auth code once
+    .then(() => instance)
+    .catch(err => { console.error('MSAL init error:', err); return instance; });
+
+  return _initPromise;
+}
+
 export default function App({ Component, pageProps }) {
   const [msalInstance, setMsalInstance] = useState(null);
+  const [ready,        setReady]        = useState(false);
 
   useEffect(() => {
-    if (!isMsalConfigured) return;
-
-    const instance = new PublicClientApplication(msalConfig);
-    instance.initialize()
-      .then(() => {
-        // Handle the redirect response when returning from Microsoft login page
-        return instance.handleRedirectPromise();
-      })
-      .then(() => setMsalInstance(instance))
-      .catch(err => console.error('MSAL initialization failed:', err));
+    initMsal().then(instance => {
+      setMsalInstance(instance || null);
+      setReady(true);
+    });
   }, []);
 
-  // MSAL configured but not yet initialized — hold rendering until ready
-  if (isMsalConfigured && !msalInstance) {
-    return null;
+  if (!ready) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#0F2044', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ color: 'rgba(255,255,255,.4)', fontFamily: 'Inter,sans-serif', fontSize: 14 }}>
+          Loading…
+        </div>
+      </div>
+    );
   }
 
-  if (isMsalConfigured && msalInstance) {
+  if (msalInstance) {
     return (
       <MsalProvider instance={msalInstance}>
         <Component {...pageProps} />

@@ -22,10 +22,13 @@ export const msalConfig = {
     authority:   `https://login.microsoftonline.com/${process.env.NEXT_PUBLIC_AZURE_TENANT_ID || 'common'}`,
     redirectUri: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000',
     postLogoutRedirectUri: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000',
+    // Prevent MSAL from navigating a second time after processing the redirect
+    // response — this second navigation was causing the post-login loop.
+    navigateToLoginRequestUrl: false,
   },
   cache: {
-    cacheLocation:        'localStorage',   // persist login across browser restarts
-    storeAuthStateInCookie: false,
+    cacheLocation:          'localStorage', // persist login across browser restarts
+    storeAuthStateInCookie: true,           // extra resilience for Safari / strict cookie policies
   },
 };
 
