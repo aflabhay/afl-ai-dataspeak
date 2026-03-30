@@ -1,17 +1,18 @@
-// frontend/pages/index.jsx
-import Head        from 'next/head';
-import ChatWindow  from '../components/ChatWindow';
+import Head     from 'next/head';
+import ChatWindow from '../components/ChatWindow';
+import AuthGate   from '../components/AuthGate';
 
 export default function Home() {
   return (
     <>
       <Head>
-        <title>Data Analytics Assistant</title>
-        <meta name="description" content="Chat with your BigQuery and Fabric data using GPT-4o-mini" />
+        <title>AIDA — Arvind Intelligent Data Assistant</title>
+        <meta name="description" content="Ask questions about your AFL data in plain English" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
-      <main>
+      <AuthGate>
         <ChatWindow />
-      </main>
+      </AuthGate>
     </>
   );
 }
