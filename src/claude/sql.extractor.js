@@ -10,35 +10,46 @@
  */
 
 /**
- * Extract SQL and explanation from Claude's response text.
+ * Extract SQL, chart config, and explanation from the AI response text.
  *
- * @param {string} response — full text response from Claude
- * @returns {{ sql: string|null, explanation: string }}
+ * @param {string} response — full text response from AI
+ * @returns {{ sql: string|null, explanation: string, chart: object|null }}
  */
 function extract(response) {
   if (!response || typeof response !== 'string') {
-    return { sql: null, explanation: '' };
+    return { sql: null, explanation: '', chart: null };
   }
 
-  // Match ```sql ... ``` block (case-insensitive, multiline)
+  // Extract ```sql ... ``` block
   const sqlBlockRegex = /```sql\s*([\s\S]*?)\s*```/i;
-  const match = response.match(sqlBlockRegex);
+  const sqlMatch = response.match(sqlBlockRegex);
 
-  if (!match) {
-    // Fallback: try to find a raw SELECT statement
-    const selectRegex = /(SELECT[\s\S]+?(?:LIMIT\s+\d+|;|$))/i;
-    const fallback = response.match(selectRegex);
+  // Extract ```json ... ``` block (chart config)
+  const jsonBlockRegex = /```json\s*([\s\S]*?)\s*```/i;
+  const jsonMatch = response.match(jsonBlockRegex);
 
-    return {
-      sql:         fallback ? fallback[1].trim() : null,
-      explanation: response.trim(),
-    };
+  let chart = null;
+  if (jsonMatch) {
+    try { chart = JSON.parse(jsonMatch[1].trim()); } catch { /* ignore bad JSON */ }
   }
 
-  const sql         = match[1].trim();
-  const explanation = response.replace(sqlBlockRegex, '').trim();
+  // Clean explanation: remove both code blocks
+  let explanation = response
+    .replace(sqlBlockRegex, '')
+    .replace(jsonBlockRegex, '')
+    .trim();
 
-  return { sql, explanation };
+  if (!sqlMatch) {
+    // Fallback: strip the JSON block then stop at a blank line (paragraph break
+    // between SQL and plain-English explanation) or semicolon.
+    // Never use bare `$` — it would capture the entire explanation as SQL.
+    const cleanedForFallback = response.replace(jsonBlockRegex, '').trim();
+    const selectRegex = /(SELECT[\s\S]+?)(?:;|(?=\n\n)|$(?!\n))/i;
+    const fallback = cleanedForFallback.match(selectRegex);
+    return { sql: fallback ? fallback[1].trim() : null, explanation, chart };
+  }
+
+  return { sql: sqlMatch[1].trim(), explanation, chart };
 }
 
 /**
