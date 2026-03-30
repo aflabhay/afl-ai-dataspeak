@@ -1305,6 +1305,7 @@ tbody td:first-child { font-weight: 500; }
 .meta-table-scroll {
   overflow-y: auto;
   flex: 1;
+  min-height: 0; /* required: prevents flex child from expanding past parent max-height */
 }
 
 .meta-table {

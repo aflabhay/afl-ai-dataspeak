@@ -129,9 +129,31 @@ async function getSamples(dataset, tableName) {
   }
 }
 
+// Maximum columns per INSERT statement — keeps individual queries small
+// while still batching all columns (avoids per-column DML rate limits).
+const INSERT_CHUNK_SIZE = 100;
+
 /**
- * Save column samples to the metadata table (append-only insert).
- * ROW_NUMBER on read always picks the latest row, so this acts as an upsert.
+ * Escape a string value for safe inclusion in a BigQuery SQL literal.
+ * Only used for values that we construct ourselves (column names, types,
+ * dataset names, and JSON-encoded sample arrays — all trusted sources).
+ */
+function sqlEscape(val) {
+  if (val === null || val === undefined) return 'NULL';
+  return "'" + String(val).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+}
+
+/**
+ * Save column samples to the metadata table using a single batched INSERT
+ * per chunk of INSERT_CHUNK_SIZE columns.
+ *
+ * Uses a single INSERT … UNION ALL SELECT per batch instead of one INSERT
+ * per column — avoids BigQuery DML rate limits that silently truncate
+ * large-column tables (e.g. only 15 of 80 columns were being saved).
+ *
+ * DML INSERT (not streaming API) so rows are immediately available for
+ * UPDATE in updateDescriptions(). Streaming inserts land in a buffer where
+ * DML is blocked until BigQuery flushes it (can take minutes to hours).
  *
  * @param {string}   dataset
  * @param {string}   tableName
@@ -143,32 +165,34 @@ async function saveSamples(dataset, tableName, columns, samplesMap) {
   await ensureTable();
 
   const bq  = getClient();
-  const now = new Date().toISOString();
+  const now = sqlEscape(new Date().toISOString());
+  const ds  = sqlEscape(dataset);
+  const tbl = sqlEscape(tableName);
 
-  // Use DML INSERT (not streaming API) so rows are immediately available for
-  // UPDATE in updateDescriptions(). Streaming inserts land in a buffer where
-  // DML is blocked until BigQuery flushes it (can take minutes to hours).
   try {
-    for (const col of columns) {
-      const samples = samplesMap[col.name] ? JSON.stringify(samplesMap[col.name]) : null;
+    // Chunk columns so each INSERT stays manageable
+    for (let i = 0; i < columns.length; i += INSERT_CHUNK_SIZE) {
+      const chunk = columns.slice(i, i + INSERT_CHUNK_SIZE);
+
+      // Build: SELECT 'dataset','table','colName','colType',<samples>,NULL,<now>,<now>
+      //        UNION ALL SELECT ...
+      const unionRows = chunk.map(col => {
+        const samples = samplesMap[col.name]
+          ? sqlEscape(JSON.stringify(samplesMap[col.name]))
+          : 'NULL';
+        return `SELECT ${ds}, ${tbl}, ${sqlEscape(col.name)}, ${sqlEscape(col.type)}, ${samples}, NULL, ${now}, ${now}`;
+      }).join('\nUNION ALL\n');
+
       await bq.query({
         query: `
           INSERT INTO \`${META_DATASET}.${META_TABLE}\`
             (dataset_name, table_name, column_name, data_type, sample_values,
              business_description, last_sampled_at, updated_at)
-          VALUES
-            (@dataset, @tableName, @columnName, @dataType, @samples,
-             NULL, @now, @now)
+          ${unionRows}
         `,
-        params: {
-          dataset,
-          tableName,
-          columnName:  col.name,
-          dataType:    col.type,
-          samples,
-          now,
-        },
       });
+
+      logger.info(`Column metadata batch saved: ${tableName} cols ${i + 1}–${Math.min(i + INSERT_CHUNK_SIZE, columns.length)} of ${columns.length}`);
     }
 
     // Warm in-memory cache
@@ -177,7 +201,7 @@ async function saveSamples(dataset, tableName, columns, samplesMap) {
       newMap[col.name] = { samples: samplesMap[col.name] || [], description: '', dataType: col.type };
     }
     memCache.set(`${dataset}.${tableName}`, { samplesMap: newMap, fetchedAt: Date.now() });
-    logger.info(`Column metadata saved for ${dataset}.${tableName} (${columns.length} columns)`);
+    logger.info(`Column metadata saved for ${dataset}.${tableName} (${columns.length} columns total)`);
   } catch (err) {
     logger.warn(`Column metadata save failed for ${tableName}: ${err.message}`);
   }
