@@ -1,6 +1,8 @@
 /**
  * frontend/components/MessageBubble.jsx
  */
+import ReactMarkdown from 'react-markdown';
+
 export default function MessageBubble({ role, content, aiProvider, timestamp }) {
   const isUser  = role === 'user';
   const isError = role === 'error';
@@ -47,7 +49,9 @@ export default function MessageBubble({ role, content, aiProvider, timestamp }) 
           )}
           {timeLabel && <span className="meta-timestamp">{timeLabel}</span>}
         </div>
-        <div className={`bubble ${role}`}>{content}</div>
+        <div className={`bubble ${role}`}>
+          {isUser ? content : <ReactMarkdown>{content}</ReactMarkdown>}
+        </div>
       </div>
     </div>
   );
