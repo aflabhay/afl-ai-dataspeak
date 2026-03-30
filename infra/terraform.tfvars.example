@@ -1,0 +1,37 @@
+# infra/terraform.tfvars.example
+# ──────────────────────────────
+# Copy this file to terraform.tfvars and fill in your values.
+# terraform.tfvars is gitignored — NEVER commit it.
+#
+# Usage:
+#   cp terraform.tfvars.example terraform.tfvars
+#   terraform init
+#   terraform plan
+#   terraform apply
+
+project_id = "your-gcp-project-id"
+region     = "asia-south1"
+app_name   = "aida"
+
+# AI provider
+ai_provider  = "openai"       # "openai" or "claude"
+openai_model = "gpt-4o-mini"
+
+# Secrets (required)
+openai_api_key  = "sk-..."
+azure_client_id = "cda66015-..."
+azure_tenant_id = "d6454b9f-..."
+
+# Secrets (optional)
+anthropic_api_key       = ""   # fill if ai_provider = "claude"
+mssql_connection_string = ""   # fill if using Microsoft Fabric
+
+# BigQuery
+gcp_feedback_dataset = "AFL_AI"
+max_bq_scan_gb       = "5"
+
+# Scaling
+backend_min_instances  = 0
+backend_max_instances  = 10
+frontend_min_instances = 0
+frontend_max_instances = 5

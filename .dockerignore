@@ -1,0 +1,52 @@
+# .dockerignore — keep Docker build context lean
+
+# Dependencies (installed inside container)
+node_modules
+frontend/node_modules
+
+# Build outputs
+frontend/.next
+frontend/out
+
+# Environment files (never bake secrets into image)
+.env
+.env.*
+frontend/.env
+frontend/.env.*
+
+# Dev/test artefacts
+coverage
+tests
+*.test.js
+*.spec.js
+jest.config.js
+.eslintrc*
+
+# Git & IDE
+.git
+.gitignore
+.github
+.idea
+.vscode
+
+# Local data (vector store, caches)
+data/lancedb
+data/semantic_cache.json
+
+# Docs
+*.md
+docs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Terraform (never in image)
+infra/
+
+# GCP service account keys — must never be in image
+*.json
+!package.json
+!package-lock.json
+!frontend/package.json
+!frontend/package-lock.json

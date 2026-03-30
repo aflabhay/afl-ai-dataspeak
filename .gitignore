@@ -32,3 +32,12 @@ Thumbs.db
 
 # LanceDB vector store (local, rebuilt automatically)
 data/lancedb/
+
+# Terraform
+infra/.terraform/
+infra/.terraform.lock.hcl
+infra/terraform.tfstate
+infra/terraform.tfstate.backup
+infra/terraform.tfvars
+infra/*.tfplan
+infra/crash.log
