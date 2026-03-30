@@ -189,9 +189,10 @@ Just ask me a question about AFL data and I'll get you the answer.`;
         return res.json({ turnId, explanation: identity, sql: null, results: null, rowCount: 0, executionMs: identityMs, sessionId, aiProvider: 'None', intent: 'CHAT' });
       }
 
-      // ── Compliments / gratitude — respond warmly ──────────────────────────
+      // ── Compliments / gratitude — respond warmly (only if no question embedded) ──
       const complimentPatterns = /\b(thank(s| you)|love you|you('re| are) (awesome|amazing|great|fantastic|brilliant|the best|helpful)|great (job|work|answer)|well done|nicely done|appreciate|you rock|good (job|work)|cheers)\b/i;
-      if (complimentPatterns.test(question)) {
+      const hasQuestion = /\?|^(what|who|how|why|when|where|can you|could you|tell me|explain|describe)\b/i.test(question);
+      if (complimentPatterns.test(question) && !hasQuestion) {
         const replies = [
           "Thank you, that means a lot! 😊 Happy to help whenever you need data insights.",
           "Glad I could help! Feel free to ask me anything about AFL's data anytime.",
@@ -219,8 +220,8 @@ Just ask me a question about AFL data and I'll get you the answer.`;
         } catch { /* schema context is best-effort */ }
       }
 
-      const chatPrompt = `You are a helpful data analyst and SQL expert working with ${source === 'bigquery' ? 'Google BigQuery' : 'Microsoft Fabric'}.
-Answer the user's question clearly and concisely. If giving SQL advice, be specific.
+      const chatPrompt = `You are AIDA (Arvind Intelligent Data Assistant), a friendly and helpful data analyst for Arvind Fashions Limited, working with ${source === 'bigquery' ? 'Google BigQuery' : 'Microsoft Fabric'}.
+Answer the user's question clearly and concisely. If the user pays you a compliment alongside their question, acknowledge it warmly before answering. If giving SQL advice, be specific.
 Do not generate a SQL query to execute — just answer the question.
 ${schemaContext ? `\nRelevant schema context:\n${schemaContext}` : ''}`;
 
