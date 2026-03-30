@@ -7,15 +7,21 @@
  * Safety measures:
  *  - read-only job configuration (no writes)
  *  - query timeout of 60 seconds
- *  - result cap of 10,000 rows
+ *  - result cap of 100 rows
  */
 
 const { getClient }    = require('./bigquery.client');
 const { validateReadOnly } = require('../claude/sql.extractor');
 const logger = require('../utils/logger');
 
-const MAX_ROWS      = 10_000;
+const MAX_ROWS      = 100;
 const TIMEOUT_MS    = 60_000; // 60 seconds
+
+// Bytes-billed cap is independent of row count — driven by MAX_BQ_SCAN_GB.
+// The cost estimator (dry-run) already blocks oversized queries before they run;
+// this is a secondary safety net at the BigQuery job level.
+const MAX_SCAN_GB          = parseFloat(process.env.MAX_BQ_SCAN_GB || '5');
+const MAX_BYTES_BILLED     = String(Math.round(MAX_SCAN_GB * 1024 * 1024 * 1024));
 
 /**
  * Run a SQL query and return rows as plain objects.
@@ -35,7 +41,7 @@ async function run(sql) {
   const options = {
     query:             sql,
     location:          process.env.GCP_LOCATION || 'US',
-    maximumBytesBilled: String((MAX_ROWS) * 1024 * 1024), // loose cap
+    maximumBytesBilled: MAX_BYTES_BILLED,
     timeoutMs:         TIMEOUT_MS,
     jobPrefix:         'claude_app_',
   };
