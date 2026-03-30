@@ -32,7 +32,7 @@ const client = new OpenAI({
 });
 
 const MODEL          = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-const MAX_TOKENS     = 2048;
+const MAX_TOKENS     = 4096;
 const MAX_RETRIES    = 3;
 const RETRY_DELAY_MS = 1000;
 

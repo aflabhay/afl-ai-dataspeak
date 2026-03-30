@@ -18,11 +18,23 @@ const logger = require('./logger');
  * @param {object}   aiClient   — has .ask(systemPrompt, messages)
  * @returns {Promise<Array<{ category: string, questions: string[] }>>}
  */
+const MAX_COLS_IN_PROMPT = 60; // keep prompt lean for wide tables
+
 async function generateQuestions(tableName, columns, aiClient) {
   if (!columns || columns.length === 0) return [];
 
+  // For tables with many columns, prioritise enriched columns (those with
+  // descriptions or sample values) so the prompt stays within token budget.
+  let promptCols = columns;
+  if (columns.length > MAX_COLS_IN_PROMPT) {
+    const enriched  = columns.filter(c => c.description || (c.samples && c.samples.length > 0));
+    const remaining = columns.filter(c => !c.description && !(c.samples && c.samples.length > 0));
+    promptCols = [...enriched, ...remaining].slice(0, MAX_COLS_IN_PROMPT);
+    logger.info(`question.generator: ${tableName} has ${columns.length} columns — using top ${MAX_COLS_IN_PROMPT} for prompt`);
+  }
+
   // Build a compact schema summary for the prompt
-  const schemaLines = columns.map(col => {
+  const schemaLines = promptCols.map(col => {
     const samples = col.samples?.length > 0
       ? ` [e.g. ${col.samples.slice(0, 3).join(', ')}]`
       : '';
