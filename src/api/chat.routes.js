@@ -96,6 +96,24 @@ router.post('/', async (req, res, next) => {
     const recentHistory = history.slice(-MAX_HISTORY_TURNS);
     const intent        = await classify(question, aiClient);
 
+    // ── OFF_TOPIC intent: hard refusal — no AI call, no cost ─────────────────
+    if (intent === 'OFF_TOPIC') {
+      logger.info(`OFF_TOPIC intent — refusing: "${question.slice(0, 60)}"`);
+      const refusal = "I'm AIDA, AFL's data assistant. I can only help with questions about Arvind Fashions business data — sales, customers, brands, RFM analysis, and related analytics. Please ask me a data question.";
+      saveTurn({ id: turnId, sessionId, question, explanation: refusal, aiProvider: 'None', source, dataset, intent: 'OFF_TOPIC', executionMs: Date.now() - startTime, userId: user.id, userName: user.name, userEmail: user.email }).catch(() => {});
+      return res.json({
+        turnId,
+        explanation: refusal,
+        sql:         null,
+        results:     null,
+        rowCount:    0,
+        executionMs: Date.now() - startTime,
+        sessionId,
+        aiProvider:  'None',
+        intent:      'OFF_TOPIC',
+      });
+    }
+
     // ── SCHEMA intent: describe table fields without running any SQL ──────────
     if (intent === 'SCHEMA') {
       logger.info(`SCHEMA intent — describing fields for: "${question}"`);

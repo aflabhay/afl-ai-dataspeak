@@ -19,13 +19,15 @@
 
 const logger = require('./logger');
 
-const SYSTEM_PROMPT = `You are a query intent classifier. Classify the user's question into exactly one of:
+const SYSTEM_PROMPT = `You are a query intent classifier for AIDA, Arvind Fashions Limited's internal data analytics assistant.
+Classify the user's question into exactly one of:
 
-QUERY   - needs data retrieved from a database (counts, aggregations, lists, trends, comparisons)
-SCHEMA  - asking about table/column structure, field names, data types, what columns exist, what a field means
-CHAT    - conversational question: SQL advice, best practices, clarifications, explanations about previous results, general data questions that don't need a DB query
+QUERY     - needs data retrieved from a database (counts, aggregations, lists, trends, comparisons, insights)
+SCHEMA    - asking about table/column structure, field names, data types, what columns exist, what a field means
+CHAT      - conversational question about AFL business data: SQL advice, RFM concepts, clarifications about previous results, data/analytics questions
+OFF_TOPIC - anything unrelated to AFL business data, analytics, or SQL — personal questions, fitness, finance, general knowledge, coding help, creative writing, or any non-AFL topic
 
-Reply with ONLY the single word: QUERY, SCHEMA, or CHAT. No explanation.
+Reply with ONLY the single word: QUERY, SCHEMA, CHAT, or OFF_TOPIC. No explanation.
 
 Examples:
 "show me top 10 customers by revenue" → QUERY
@@ -34,7 +36,12 @@ Examples:
 "should I use COUNT or COUNT DISTINCT for customers?" → CHAT
 "why did the last query return zero rows?" → CHAT
 "what is RFM analysis?" → CHAT
-"give me monthly sales by brand" → QUERY`;
+"give me monthly sales by brand" → QUERY
+"can you help me run a sub 40 minute 10k?" → OFF_TOPIC
+"what is the capital of France?" → OFF_TOPIC
+"help me invest in stocks" → OFF_TOPIC
+"write me a poem" → OFF_TOPIC
+"what's the weather today?" → OFF_TOPIC`;
 
 /**
  * Classify the intent of a user question.
@@ -48,7 +55,7 @@ async function classify(question, aiClient) {
     const { text } = await aiClient.ask(SYSTEM_PROMPT, question);
     const intent   = text.trim().toUpperCase();
 
-    if (['QUERY', 'SCHEMA', 'CHAT'].includes(intent)) {
+    if (['QUERY', 'SCHEMA', 'CHAT', 'OFF_TOPIC'].includes(intent)) {
       logger.info(`Intent classified: ${intent} for "${question.slice(0, 60)}"`);
       return intent;
     }
