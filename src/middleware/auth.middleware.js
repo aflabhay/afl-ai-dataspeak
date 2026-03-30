@@ -57,21 +57,9 @@ function requireAuth(req, res, next) {
 
   const authHeader = req.headers.authorization;
 
-  // ── Guest mode: no Bearer token but guest identity headers present ───────
-  // Used when frontend has Azure AD disabled (NEXT_PUBLIC_AZURE_CLIENT_ID blank)
-  // but backend env vars are still set.
+  // Microsoft login is mandatory — reject any request without a Bearer token
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    const guestId    = req.headers['x-guest-id'];
-    const guestName  = req.headers['x-guest-name'];
-    const guestEmail = req.headers['x-guest-email'];
-
-    if (guestId && guestName) {
-      req.user = { id: guestId, name: guestName, email: guestEmail || '' };
-      logger.info(`Guest user: ${guestName} (${guestEmail})`);
-      return next();
-    }
-
-    return res.status(401).json({ error: 'Authentication required. Please sign in.' });
+    return res.status(401).json({ error: 'Authentication required. Please sign in with your Microsoft account.' });
   }
 
   const token = authHeader.slice(7);

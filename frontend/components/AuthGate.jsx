@@ -234,10 +234,22 @@ export function NoAuthGate({ children }) {
   );
 }
 
-// ── Default export — picks the right gate automatically ───────────────────────
+// ── Default export — Microsoft login is mandatory ─────────────────────────────
 export default function AuthGate({ children }) {
   if (isMsalConfigured) {
     return <MsalAuthGate>{children}</MsalAuthGate>;
   }
-  return <NoAuthGate>{children}</NoAuthGate>;
+
+  // MSAL not configured — show a setup error instead of falling back to guest mode
+  return (
+    <div className="login-shell">
+      <div className="login-card">
+        <LoginBrand />
+        <div className="login-error" style={{ marginTop: 24 }}>
+          ⚠ Microsoft login is not configured.<br />
+          Set <code>NEXT_PUBLIC_AZURE_CLIENT_ID</code> and <code>NEXT_PUBLIC_AZURE_TENANT_ID</code> in <code>frontend/.env.local</code> and restart.
+        </div>
+      </div>
+    </div>
+  );
 }
