@@ -33,6 +33,16 @@ resource "google_project_service" "apis" {
   disable_on_destroy = false
 }
 
+# ── Terraform state bucket IAM ───────────────────────────────────────────────
+# Grant the deploying service account full object access on the state bucket
+# so Terraform can read, write and delete state locks.
+
+resource "google_storage_bucket_iam_member" "tf_state_sa" {
+  bucket = "arvind-brands-poc-tf-state"
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${var.gcp_sa_email}"
+}
+
 # ── Artifact Registry ─────────────────────────────────────────────────────────
 
 resource "google_artifact_registry_repository" "images" {

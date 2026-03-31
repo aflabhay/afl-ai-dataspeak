@@ -1,3 +1,9 @@
+variable "gcp_sa_email" {
+  description = "Email of the service account used by Terraform (needs storage.objectAdmin on the state bucket)"
+  type        = string
+  default     = "afl-ai-aida@arvind-brands-poc.iam.gserviceaccount.com"
+}
+
 variable "gcp_credentials_file" {
   description = "Path to the GCP service account JSON key file"
   type        = string
