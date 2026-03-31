@@ -23,8 +23,9 @@ terraform {
   #   # Then init as normal — ADC will use the activated service account
   #   terraform init
   backend "gcs" {
-    bucket = "arvind-brands-poc-tf-state"
-    prefix = "aida/terraform.tfstate"
+    bucket      = "arvind-brands-poc-tf-state"
+    prefix      = "aida/terraform.tfstate"
+    credentials = "../afl-ai-aida-chatbot.json"
   }
 }
 
