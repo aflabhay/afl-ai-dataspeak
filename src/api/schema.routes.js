@@ -44,19 +44,22 @@ router.get('/metadata', async (req, res, next) => {
       return res.json({ tableName: table, dataset, source, columns, fromMetadata: true });
     }
 
-    // Fallback: live schema fetch (no descriptions or samples)
+    // Metadata not found — fetch schema (triggers one-time sampling + enrichment for both sources)
     const fetcher = source === 'fabric' ? fbSchemaFetcher : bqSchemaFetcher;
     const schema  = await fetcher.fetchSchema(dataset, [table]);
     const tableSchema = schema?.[0];
     if (!tableSchema) {
       return res.json({ tableName: table, dataset, source, columns: [], fromMetadata: false });
     }
+
+    // If columns now have samples (Fabric fetcher just sampled), mark as metadata
+    const hasSamples = tableSchema.columns.some(c => c.samples && c.samples.length > 0);
     return res.json({
       tableName:    table,
       dataset,
       source,
       columns:      tableSchema.columns,
-      fromMetadata: false,
+      fromMetadata: hasSamples,
     });
   } catch (err) {
     next(err);
