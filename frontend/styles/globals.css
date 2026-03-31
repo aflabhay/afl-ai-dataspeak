@@ -1294,6 +1294,23 @@ tbody td:first-child { font-weight: 500; }
 }
 .meta-modal-close:hover { color: var(--text); }
 
+/* Multi-table chips under the table input */
+.table-chips        { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.table-chip         { background: rgba(37,99,235,.15); color: var(--blue); border-radius: 4px; padding: 2px 7px; font-size: 11px; }
+
+/* Per-table accordion inside metadata modal */
+.meta-table-section { border-bottom: 1px solid var(--border); }
+.meta-table-section:last-child { border-bottom: none; }
+.meta-table-header  {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  background: none; border: none; padding: 10px 0; cursor: pointer;
+  color: var(--text); text-align: left;
+}
+.meta-table-header:hover { background: rgba(255,255,255,.03); }
+.meta-table-name    { font-weight: 600; font-size: 13px; flex: 1; }
+.meta-table-meta    { font-size: 11px; color: var(--text-muted); }
+.meta-table-chevron { font-size: 10px; color: var(--text-muted); margin-left: 4px; }
+
 .meta-modal-loading, .meta-modal-error {
   padding: 32px 24px;
   display: flex;

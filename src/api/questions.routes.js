@@ -21,7 +21,7 @@ const router   = express.Router();
 const columnMetadata      = require('../bigquery/column.metadata');
 const bqSchemaFetcher     = require('../bigquery/schema.fetcher');
 const fbSchemaFetcher     = require('../fabric/schema.fetcher');
-const { generateQuestions } = require('../utils/question.generator');
+const { generateQuestionsMultiTable } = require('../utils/question.generator');
 const { fetchGeneratedQuestions, saveGeneratedQuestions } = require('../bigquery/questions.store');
 const { streamAsk }       = require('../utils/streaming.client');
 const logger              = require('../utils/logger');
@@ -39,16 +39,22 @@ function getAIClient() {
 }
 
 router.get('/', async (req, res, next) => {
-  const tableName = (req.query.table     || '').trim();
+  // Accept `tables` (comma-separated) or legacy `table` (single)
+  const rawTables = (req.query.tables || req.query.table || '').trim();
+  const tableList = rawTables.split(',').map(t => t.trim()).filter(Boolean);
   const dataset   = (req.query.dataset   || '').trim();
   const source    = (req.query.source    || 'bigquery').trim();
-  const checkOnly = req.query.checkOnly  === 'true'; // if true: return stored only, never generate
+  const checkOnly = req.query.checkOnly  === 'true';
 
-  if (!tableName || !dataset) {
+  if (tableList.length === 0 || !dataset) {
     return res.json({ categories: [] });
   }
 
-  const cacheKey = `${source}.${dataset}.${tableName}`;
+  // Composite cache key — sorted so order doesn't matter
+  const compositeKey = tableList.slice().sort().join('+');
+  const cacheKey     = `${source}.${dataset}.${compositeKey}`;
+  // Use composite as the stored table_name in BigQuery questions table
+  const tableName    = compositeKey;
 
   // ── L1: In-memory cache hit ─────────────────────────────────────────────────
   const hit = cache.get(cacheKey);
@@ -71,54 +77,53 @@ router.get('/', async (req, res, next) => {
       return res.json({ categories: [] });
     }
 
-    // ── Fetch column metadata ─────────────────────────────────────────────────
-    // Metadata is already warmed by SourceSelector's background call to
-    // /api/schema/metadata whenever the user focuses a table.
-    // Try the metadata table first (has descriptions + samples); fall back
-    // to a live schema fetch if metadata isn't populated yet.
-    let columns = [];
-    const metaMap = await columnMetadata.getSamples(dataset, tableName);
+    // ── Fetch column metadata for ALL tables ─────────────────────────────────
+    const tablesWithCols = [];
+    for (const tbl of tableList) {
+      let columns = [];
+      const metaMap = await columnMetadata.getSamples(dataset, tbl);
 
-    if (metaMap && Object.keys(metaMap).length > 0) {
-      columns = Object.entries(metaMap).map(([name, meta]) => ({
-        name,
-        type:        meta.dataType || 'STRING',
-        description: meta.description || '',
-        samples:     meta.samples || [],
-      }));
-    } else {
-      // Metadata not yet available — fetch schema live as fallback
-      logger.info(`Metadata not ready for ${tableName} — falling back to live schema fetch`);
-      const schema = source === 'bigquery'
-        ? await bqSchemaFetcher.fetchSchema(dataset, [tableName])
-        : await fbSchemaFetcher.fetchSchema(dataset, [tableName]);
-      const tableSchema = schema?.[0];
-      if (tableSchema) {
-        columns = tableSchema.columns.map(c => ({
-          name:        c.name,
-          type:        c.type,
-          description: c.description || '',
-          samples:     c.samples || [],
+      if (metaMap && Object.keys(metaMap).length > 0) {
+        columns = Object.entries(metaMap).map(([name, meta]) => ({
+          name,
+          type:        meta.dataType    || 'STRING',
+          description: meta.description || '',
+          samples:     meta.samples     || [],
         }));
+      } else {
+        // Metadata not yet available — fetch schema live (triggers one-time sampling)
+        logger.info(`Metadata not ready for ${tbl} — falling back to live schema fetch`);
+        const schema = source === 'bigquery'
+          ? await bqSchemaFetcher.fetchSchema(dataset, [tbl])
+          : await fbSchemaFetcher.fetchSchema(dataset, [tbl]);
+        const tableSchema = schema?.[0];
+        if (tableSchema) {
+          columns = tableSchema.columns.map(c => ({
+            name:        c.name,
+            type:        c.type,
+            description: c.description || '',
+            samples:     c.samples     || [],
+          }));
+        }
       }
+      if (columns.length > 0) tablesWithCols.push({ tableName: tbl, columns });
     }
 
-    if (columns.length === 0) {
+    if (tablesWithCols.length === 0) {
       return res.json({ categories: [] });
     }
 
-    logger.info(`Generating questions for ${tableName} (${columns.length} columns)`);
+    logger.info(`Generating questions for ${tablesWithCols.map(t => t.tableName).join(', ')} (${tablesWithCols.length} tables)`);
 
-    const aiClient  = getAIClient();
-    const isOpenAI  = (process.env.AI_PROVIDER || 'openai').toLowerCase() === 'openai';
-
-    const client = {
+    const aiClient = getAIClient();
+    const isOpenAI = (process.env.AI_PROVIDER || 'openai').toLowerCase() === 'openai';
+    const client   = {
       ask: (systemPrompt, messages) => isOpenAI
         ? require('../openai/openai.client').ask(systemPrompt, messages)
         : aiClient.ask(systemPrompt, messages),
     };
 
-    const categories = await generateQuestions(tableName, columns, client);
+    const categories = await generateQuestionsMultiTable(tablesWithCols, client);
 
     // ── Store in L1 (memory) + L2 (BigQuery) ─────────────────────────────────
     cache.set(cacheKey, { categories, generatedAt: Date.now() });

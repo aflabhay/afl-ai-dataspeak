@@ -27,40 +27,51 @@ const logger          = require('../utils/logger');
  * Used by the sidebar "View Columns" button.
  */
 router.get('/metadata', async (req, res, next) => {
-  const { dataset, table, source = 'bigquery' } = req.query;
-  if (!dataset || !table) {
-    return res.status(400).json({ error: '`dataset` and `table` are required.' });
+  const { dataset, source = 'bigquery' } = req.query;
+
+  // Accept both `table` (single) and `tables` (comma-separated) params
+  const rawTables = (req.query.tables || req.query.table || '').trim();
+  const tableList = rawTables.split(',').map(t => t.trim()).filter(Boolean);
+
+  if (!dataset || tableList.length === 0) {
+    return res.status(400).json({ error: '`dataset` and `table` (or `tables`) are required.' });
   }
+
   try {
-    // Try the metadata table first (has enriched descriptions + sample values)
-    const metaMap = await columnMetadata.getSamples(dataset, table);
-    if (metaMap && Object.keys(metaMap).length > 0) {
-      const columns = Object.entries(metaMap).map(([name, meta]) => ({
-        name,
-        type:        meta.dataType   || 'STRING',
-        description: meta.description || '',
-        samples:     meta.samples    || [],
-      }));
-      return res.json({ tableName: table, dataset, source, columns, fromMetadata: true });
-    }
-
-    // Metadata not found — fetch schema (triggers one-time sampling + enrichment for both sources)
     const fetcher = source === 'fabric' ? fbSchemaFetcher : bqSchemaFetcher;
-    const schema  = await fetcher.fetchSchema(dataset, [table]);
-    const tableSchema = schema?.[0];
-    if (!tableSchema) {
-      return res.json({ tableName: table, dataset, source, columns: [], fromMetadata: false });
+    const results = [];
+
+    for (const table of tableList) {
+      // Try the metadata table first (has enriched descriptions + sample values)
+      const metaMap = await columnMetadata.getSamples(dataset, table);
+      if (metaMap && Object.keys(metaMap).length > 0) {
+        const columns = Object.entries(metaMap).map(([name, meta]) => ({
+          name,
+          type:        meta.dataType    || 'STRING',
+          description: meta.description || '',
+          samples:     meta.samples     || [],
+        }));
+        results.push({ tableName: table, columns, fromMetadata: true });
+        continue;
+      }
+
+      // Metadata not found — fetch schema (triggers one-time sampling + enrichment)
+      const schema = await fetcher.fetchSchema(dataset, [table]);
+      const tableSchema = schema?.[0];
+      if (!tableSchema) {
+        results.push({ tableName: table, columns: [], fromMetadata: false });
+        continue;
+      }
+      const hasSamples = tableSchema.columns.some(c => c.samples && c.samples.length > 0);
+      results.push({ tableName: table, columns: tableSchema.columns, fromMetadata: hasSamples });
     }
 
-    // If columns now have samples (Fabric fetcher just sampled), mark as metadata
-    const hasSamples = tableSchema.columns.some(c => c.samples && c.samples.length > 0);
-    return res.json({
-      tableName:    table,
-      dataset,
-      source,
-      columns:      tableSchema.columns,
-      fromMetadata: hasSamples,
-    });
+    // Single-table callers get the original shape; multi-table callers get `tables` array
+    if (tableList.length === 1) {
+      return res.json({ ...results[0], dataset, source });
+    }
+    return res.json({ tables: results, dataset, source });
+
   } catch (err) {
     next(err);
   }

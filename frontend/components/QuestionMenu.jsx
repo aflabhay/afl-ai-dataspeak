@@ -19,26 +19,28 @@ export default function QuestionMenu({ table, dataset, source, onSelect }) {
   const debounceRef                   = useRef(null);
   const lastKeyRef                    = useRef('');
 
+  // Parse all tables — use sorted join as cache key (matches backend)
+  const tableList   = (table || '').split(',').map(t => t.trim()).filter(Boolean);
+  const compositeKey = tableList.slice().sort().join('+');
+
   useEffect(() => {
-    if (!table || !dataset) { setCategories([]); setShowButton(false); return; }
+    if (tableList.length === 0 || !dataset) { setCategories([]); setShowButton(false); return; }
 
-    const key = `${source || 'bigquery'}.${dataset}.${table}`;
-    if (key === lastKeyRef.current) return; // same table — no re-check needed
+    const key = `${source || 'bigquery'}.${dataset}.${compositeKey}`;
+    if (key === lastKeyRef.current) return;
 
-    // Reset state for new table
     setCategories([]);
     setShowButton(false);
 
     clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => checkStored(table, dataset, source || 'bigquery', key), 600);
+    debounceRef.current = setTimeout(() => checkStored(tableList, dataset, source || 'bigquery', key), 600);
     return () => clearTimeout(debounceRef.current);
-  }, [table, dataset, source]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [compositeKey, dataset, source]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Silent BQ check — returns stored questions or shows the generate button ──
-  async function checkStored(tableName, ds, src, key) {
+  async function checkStored(tList, ds, src, key) {
     setChecking(true);
     try {
-      const url = `${API_URL}/api/questions?table=${encodeURIComponent(tableName)}&dataset=${encodeURIComponent(ds)}&source=${encodeURIComponent(src)}&checkOnly=true`;
+      const url = `${API_URL}/api/questions?tables=${encodeURIComponent(tList.join(','))}&dataset=${encodeURIComponent(ds)}&source=${encodeURIComponent(src)}&checkOnly=true`;
       const res = await fetch(url);
       if (!res.ok) { setShowButton(true); return; }
       const { categories: cats } = await res.json();
@@ -48,7 +50,7 @@ export default function QuestionMenu({ table, dataset, source, onSelect }) {
         setOpenCats(new Set([cats[0].category]));
         setShowButton(false);
       } else {
-        setShowButton(true); // nothing stored → show generate button
+        setShowButton(true);
       }
     } catch {
       setShowButton(true);
@@ -57,18 +59,17 @@ export default function QuestionMenu({ table, dataset, source, onSelect }) {
     }
   }
 
-  // ── Manual generation — only called when user clicks the button ─────────────
   async function generateQuestions() {
-    if (!table || !dataset || generating) return;
+    if (tableList.length === 0 || !dataset || generating) return;
     setGenerating(true);
     setShowButton(false);
     try {
       const src = source || 'bigquery';
-      const url = `${API_URL}/api/questions?table=${encodeURIComponent(table)}&dataset=${encodeURIComponent(dataset)}&source=${encodeURIComponent(src)}`;
+      const url = `${API_URL}/api/questions?tables=${encodeURIComponent(tableList.join(','))}&dataset=${encodeURIComponent(dataset)}&source=${encodeURIComponent(src)}`;
       const res = await fetch(url);
       if (!res.ok) { setShowButton(true); return; }
       const { categories: cats } = await res.json();
-      const key = `${src}.${dataset}.${table}`;
+      const key = `${src}.${dataset}.${compositeKey}`;
       lastKeyRef.current = key;
       setCategories(cats || []);
       if (cats && cats.length > 0) setOpenCats(new Set([cats[0].category]));
@@ -88,7 +89,7 @@ export default function QuestionMenu({ table, dataset, source, onSelect }) {
     });
   }
 
-  if (!table || !dataset) return null;
+  if (tableList.length === 0 || !dataset) return null;
 
   // Silent checking spinner (very brief)
   if (checking) {

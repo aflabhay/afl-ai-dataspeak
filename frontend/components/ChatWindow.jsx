@@ -33,6 +33,18 @@ export default function ChatWindow() {
   const [source,        setSource]        = useState('bigquery');
   const [dataset,       setDataset]       = useState('DCOE_Production');
   const [table,         setTable]         = useState('t_capillary_rfm_cohort_gold_layer');
+
+  // When switching sources, reset to sensible defaults for that source
+  function handleSourceChange(newSource) {
+    setSource(newSource);
+    if (newSource === 'fabric') {
+      setDataset('prd');
+      setTable('FACT_FNO_SALES_TC_ONLINE_BASE, FACT_FNO_SOH_DAILY');
+    } else {
+      setDataset('DCOE_Production');
+      setTable('t_capillary_rfm_cohort_gold_layer');
+    }
+  }
   const [sessionId]     = useState(() => getOrCreateSessionId());
   const bottomRef       = useRef(null);
   const textareaRef     = useRef(null);
@@ -135,7 +147,7 @@ export default function ChatWindow() {
           question,
           source,
           dataset,
-          tables:    table.trim() ? [table.trim()] : [],
+          tables:    table.trim() ? table.split(',').map(t => t.trim()).filter(Boolean) : [],
           history,
           sessionId,
         }),
@@ -211,7 +223,7 @@ export default function ChatWindow() {
           source={source}
           dataset={dataset}
           table={table}
-          onSourceChange={setSource}
+          onSourceChange={handleSourceChange}
           onDatasetChange={setDataset}
           onTableChange={setTable}
         />
