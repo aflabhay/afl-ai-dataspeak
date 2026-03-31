@@ -278,31 +278,11 @@ resource "google_cloud_run_v2_service" "backend" {
         }
       }
 
-      dynamic "env" {
-        for_each = var.anthropic_api_key != "" ? toset(["enabled"]) : toset([])
-        content {
-          name = "ANTHROPIC_API_KEY"
-          value_source {
-            secret_key_ref {
-              secret  = google_secret_manager_secret.anthropic_api_key[0].secret_id
-              version = "latest"
-            }
-          }
-        }
-      }
-
-      dynamic "env" {
-        for_each = var.mssql_connection_string != "" ? toset(["enabled"]) : toset([])
-        content {
-          name = "MSSQL_CONNECTION_STRING"
-          value_source {
-            secret_key_ref {
-              secret  = google_secret_manager_secret.mssql_connection_string[0].secret_id
-              version = "latest"
-            }
-          }
-        }
-      }
+      # ANTHROPIC_API_KEY and MSSQL_CONNECTION_STRING are optional.
+      # Add them manually via: gcloud run services update aida-backend \
+      #   --update-secrets=ANTHROPIC_API_KEY=aida-anthropic-api-key:latest \
+      #   --region=asia-south1
+      # if you switch AI_PROVIDER to "claude" or enable Fabric.
 
       liveness_probe {
         http_get {
