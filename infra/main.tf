@@ -102,7 +102,9 @@ resource "google_project_iam_member" "github_sa_user" {
 
 resource "google_secret_manager_secret" "openai_api_key" {
   secret_id = "${var.app_name}-openai-api-key"
-  replication { auto {} }
+  replication {
+    auto {}
+  }
   depends_on = [google_project_service.apis]
 }
 
@@ -114,7 +116,9 @@ resource "google_secret_manager_secret_version" "openai_api_key" {
 resource "google_secret_manager_secret" "anthropic_api_key" {
   count     = var.anthropic_api_key != "" ? 1 : 0
   secret_id = "${var.app_name}-anthropic-api-key"
-  replication { auto {} }
+  replication {
+    auto {}
+  }
   depends_on = [google_project_service.apis]
 }
 
@@ -126,7 +130,9 @@ resource "google_secret_manager_secret_version" "anthropic_api_key" {
 
 resource "google_secret_manager_secret" "azure_client_id" {
   secret_id = "${var.app_name}-azure-client-id"
-  replication { auto {} }
+  replication {
+    auto {}
+  }
   depends_on = [google_project_service.apis]
 }
 
@@ -137,7 +143,9 @@ resource "google_secret_manager_secret_version" "azure_client_id" {
 
 resource "google_secret_manager_secret" "azure_tenant_id" {
   secret_id = "${var.app_name}-azure-tenant-id"
-  replication { auto {} }
+  replication {
+    auto {}
+  }
   depends_on = [google_project_service.apis]
 }
 
@@ -149,7 +157,9 @@ resource "google_secret_manager_secret_version" "azure_tenant_id" {
 resource "google_secret_manager_secret" "mssql_connection_string" {
   count     = var.mssql_connection_string != "" ? 1 : 0
   secret_id = "${var.app_name}-mssql-conn"
-  replication { auto {} }
+  replication {
+    auto {}
+  }
   depends_on = [google_project_service.apis]
 }
 
