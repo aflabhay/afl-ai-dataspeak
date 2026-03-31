@@ -9,7 +9,8 @@
 #   terraform plan
 #   terraform apply
 
-project_id = "arvind-brands-poc"
+gcp_credentials_file = "../afl-ai-aida-chatbot.json"  # path to service account key
+project_id           = "arvind-brands-poc"
 region     = "asia-south1"
 app_name   = "aida"
 
