@@ -279,7 +279,7 @@ resource "google_cloud_run_v2_service" "backend" {
       }
 
       dynamic "env" {
-        for_each = var.anthropic_api_key != "" ? [1] : []
+        for_each = var.anthropic_api_key != "" ? toset(["enabled"]) : toset([])
         content {
           name = "ANTHROPIC_API_KEY"
           value_source {
@@ -292,7 +292,7 @@ resource "google_cloud_run_v2_service" "backend" {
       }
 
       dynamic "env" {
-        for_each = var.mssql_connection_string != "" ? [1] : []
+        for_each = var.mssql_connection_string != "" ? toset(["enabled"]) : toset([])
         content {
           name = "MSSQL_CONNECTION_STRING"
           value_source {
